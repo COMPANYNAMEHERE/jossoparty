@@ -1,0 +1,36 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev (static + api proxy)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dev-server.js"],
+      "port": 3000
+    },
+    {
+      "name": "static (python http.server)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "3000"],
+      "port": 3000
+    },
+    {
+      "name": "static (npx serve)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "."],
+      "port": 3001,
+      "autoPort": true
+    },
+    {
+      "name": "docker",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "while true; do sleep 3600; done"],
+      "port": 8080
+    },
+    {
+      "name": "preview-dist",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "3030", "--directory", ".preview-dist"],
+      "port": 3030
+    }
+  ]
+}

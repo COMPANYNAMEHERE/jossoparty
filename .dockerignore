@@ -1,0 +1,11 @@
+.DS_Store
+.claude
+.git
+.gitignore
+screenshots
+dist
+node_modules
+*.md
+Dockerfile
+.dockerignore
+compose.yaml
