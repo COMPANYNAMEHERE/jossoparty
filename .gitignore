@@ -1,2 +1,29 @@
+# OS
 .DS_Store
+Thumbs.db
+
+# Dependencies
 node_modules/
+
+# Build output
+dist/
+build/
+.cache/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+
+# Keep Docker files in repo
+!Dockerfile
+!compose.yaml
+!.dockerignore
