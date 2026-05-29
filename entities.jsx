@@ -102,43 +102,46 @@ function FloatingEntities({ chaos = 1 }) {
   );
 }
 
-/* ── Click sparks, small typographic punches, no emoji ──────────────── */
-function MusicNoteOnClick({ chaos = 1 }) {
+/* ── Windows-style click sound, no visual click entities ────────────── */
+function WindowsClickSound({ chaos = 1 }) {
   React.useEffect(() => {
     if (chaos === 0) return;
+    let audioCtx = null;
+
+    const playClick = () => {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      audioCtx = audioCtx || new AudioContext();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(920, now);
+      osc.frequency.exponentialRampToValueAtTime(620, now + 0.035);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1200, now);
+      filter.Q.setValueAtTime(7, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.12, now + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.06);
+    };
+
     const onClick = (e) => {
       if (e.target.closest('[data-omelette-chrome]')) return;
       if (e.target.closest('.leaflet-container')) return;
-
-      // Single big spark glyph
-      const spark = document.createElement('div');
-      spark.className = 'note-burst';
-      spark.textContent = pick(GLYPHS_PUNCH);
-      spark.style.left = e.clientX + 'px';
-      spark.style.top = e.clientY + 'px';
-      spark.style.setProperty('--dx', (rand(-50, 50)) + 'px');
-      spark.style.setProperty('--rot', (rand(-90, 90)) + 'deg');
-      spark.style.color = pick(['#d4af37','#c4202c','#8b1d2c','#adff5c']);
-      spark.style.fontSize = rand(22, 34) + 'px';
-      document.body.appendChild(spark);
-      setTimeout(() => spark.remove(), 1400);
-
-      // Spray of confetti rectangles in palette colors
-      const colors = ['#d4af37','#8b1d2c','#f0e4c7','#c4202c','#5c0e1c'];
-      const n = Math.round(6 * chaos);
-      for (let i = 0; i < n; i++) {
-        const c = document.createElement('div');
-        c.className = 'confetti';
-        c.style.left = e.clientX + 'px';
-        c.style.top = e.clientY + 'px';
-        c.style.background = colors[i % colors.length];
-        c.style.setProperty('--dx', rand(-120, 120) + 'px');
-        c.style.setProperty('--dy', rand(-120, 30) + 'px');
-        c.style.setProperty('--rot', rand(-360, 360) + 'deg');
-        c.style.setProperty('--dur', rand(1.1, 1.8) + 's');
-        document.body.appendChild(c);
-        setTimeout(() => c.remove(), 2000);
-      }
+      playClick();
     };
     window.addEventListener('click', onClick);
     return () => window.removeEventListener('click', onClick);
@@ -150,6 +153,6 @@ function MusicNoteOnClick({ chaos = 1 }) {
 function Mascot() { return null; }
 
 Object.assign(window, {
-  BgEntities, FloatingEntities, MusicNoteOnClick, Mascot,
+  BgEntities, FloatingEntities, WindowsClickSound, Mascot,
   GLYPHS_DECOR, GLYPHS_PUNCH, pick, rand,
 });

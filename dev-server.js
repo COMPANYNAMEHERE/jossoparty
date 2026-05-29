@@ -1,20 +1,55 @@
 'use strict';
 
-// Dev server: serves the static files in this directory and proxies
-// /api/* and /votes to the docker nginx on :8080 so the RSVP backend
-// works the same as in production. No npm install required, uses
-// only Node built-ins. Run with: node dev-server.js
+// Dev server: serves the static files in this directory AND spawns the
+// API server as a child process pointing at a dev-only SQLite database,
+// so the live production DB is never touched. Proxies /api/* and /votes
+// to the local API. Run with: node dev-server.js
 //
-// Override port/backend with env vars: PORT=3000 BACKEND=http://localhost:8080
+// Override with env vars:
+//   PORT=3000          frontend port
+//   API_PORT=8080      local API port
+//   DEV_DB_PATH=...    dev SQLite file (default: ./api/data/dev-votes.db)
+//   BACKEND=http://... skip spawning the API and proxy to this URL instead
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
+const { spawn } = require('child_process');
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
-const BACKEND = new URL(process.env.BACKEND || 'http://localhost:8080');
+const API_PORT = parseInt(process.env.API_PORT, 10) || 8080;
 const ROOT = __dirname;
+const DEV_DB_PATH = path.resolve(
+  process.env.DEV_DB_PATH || path.join(ROOT, 'api', 'data', 'dev-votes.db')
+);
+const BACKEND = new URL(process.env.BACKEND || `http://localhost:${API_PORT}`);
+const SPAWN_API = !process.env.BACKEND;
+
+function startApi() {
+  fs.mkdirSync(path.dirname(DEV_DB_PATH), { recursive: true });
+  const apiDir = path.join(ROOT, 'api');
+  if (!fs.existsSync(path.join(apiDir, 'node_modules'))) {
+    console.error('api/node_modules missing — run: (cd api && npm install)');
+    process.exit(1);
+  }
+  console.log(`starting api on :${API_PORT}  db=${DEV_DB_PATH}`);
+  const child = spawn(process.execPath, ['server.js'], {
+    cwd: apiDir,
+    env: { ...process.env, PORT: String(API_PORT), DB_PATH: DEV_DB_PATH },
+    stdio: 'inherit'
+  });
+  child.on('exit', (code, sig) => {
+    console.error(`api exited (code=${code}, signal=${sig})`);
+    process.exit(code ?? 1);
+  });
+  const shutdown = () => { try { child.kill('SIGTERM'); } catch {} };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+  process.on('exit', shutdown);
+}
+
+if (SPAWN_API) startApi();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',

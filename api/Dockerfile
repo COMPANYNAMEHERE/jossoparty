@@ -10,6 +10,7 @@ RUN addgroup -S app && adduser -S app -G app \
  && mkdir -p /data && chown -R app:app /data
 COPY --from=deps /app/node_modules ./node_modules
 COPY --chown=app:app server.js ./server.js
+COPY --chown=app:app reset-data.js ./reset-data.js
 COPY --chown=app:app package.json ./package.json
 ENV NODE_ENV=production
 USER app

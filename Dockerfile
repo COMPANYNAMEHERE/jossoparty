@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 ############################
 # Stage 1: build static dist
 ############################
@@ -14,7 +12,7 @@ COPY index.html styles.css ./
 COPY tweaks-panel.jsx entities.jsx sections.jsx app.jsx ./
 COPY Images ./Images
 
-RUN mkdir -p dist/vendor/fonts dist/Images \
+RUN mkdir -p dist/vendor dist/Images \
  && cp styles.css dist/ \
  && cp -r Images/. dist/Images/
 
@@ -48,18 +46,6 @@ RUN curl -fsSLo dist/vendor/react.production.min.js \
  # /vendor and the images under /vendor/leaflet/images so rewrite the URLs:
  && sed -i 's#url(images/#url(leaflet/images/#g' dist/vendor/leaflet.css
 
-# Vendor Google Fonts: fetch CSS with a desktop UA so we get woff2, then
-# download each woff2 referenced and rewrite URLs to local paths.
-RUN UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" \
- && curl -fsSL -A "$UA" -o dist/vendor/fonts.css \
-      "https://fonts.googleapis.com/css2?family=Limelight&family=Cinzel+Decorative:wght@400;700;900&family=Special+Elite&family=DM+Sans:wght@400;500;700&display=swap" \
- && grep -oE 'https://fonts\.gstatic\.com/[^)]+' dist/vendor/fonts.css | sort -u > /tmp/fonts.list \
- && while IFS= read -r url; do \
-      fname="$(basename "$url")"; \
-      curl -fsSLo "dist/vendor/fonts/$fname" "$url"; \
-      sed -i "s#$url#./fonts/$fname#g" dist/vendor/fonts.css; \
-    done < /tmp/fonts.list
-
 # Rewrite index.html: drop Babel, swap CDN URLs, swap jsx -> js
 COPY index.html dist/index.html
 RUN python3 - <<'PY'
@@ -72,16 +58,6 @@ html = p.read_text()
 html = re.sub(
     r'\s*<script[^>]*src="[^"]*@babel/standalone[^"]*"[^>]*></script>\s*',
     '\n  ', html, flags=re.I,
-)
-
-# Drop Google Fonts preconnects (no longer needed)
-html = re.sub(r'\s*<link[^>]*rel="preconnect"[^>]*fonts\.[^"]*"[^>]*/?>\s*', '\n  ', html, flags=re.I)
-
-# Swap Google Fonts stylesheet
-html = re.sub(
-    r'<link[^>]*href="https://fonts\.googleapis\.com/[^"]*"[^>]*/?>',
-    '<link rel="stylesheet" href="./vendor/fonts.css" />',
-    html, flags=re.I,
 )
 
 # Swap Leaflet css/js (drop integrity/crossorigin)
@@ -115,6 +91,19 @@ for name in ("tweaks-panel", "entities", "sections", "app"):
         f'<script src="{name}.js"></script>',
         html,
     )
+
+# Content-hash our JS/CSS files so each build gets a new URL —
+# this busts CDN/browser caches without needing a manual purge.
+import hashlib
+for name, ext in [("tweaks-panel","js"),("entities","js"),("sections","js"),("app","js"),("styles","css")]:
+    src = pathlib.Path(f"dist/{name}.{ext}")
+    if not src.exists():
+        continue
+    h = hashlib.md5(src.read_bytes()).hexdigest()[:8]
+    hashed = f"{name}.{h}.{ext}"
+    src.rename(f"dist/{hashed}")
+    html = html.replace(f'src="{name}.{ext}"', f'src="{hashed}"')
+    html = html.replace(f'href="{name}.{ext}"', f'href="{hashed}"')
 
 p.write_text(html)
 PY
